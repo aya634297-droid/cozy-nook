@@ -1168,7 +1168,7 @@ function App() {
                       <Trophy className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-xs sm:text-sm text-zinc-100">تحدي القراءة السنوي (2026) 🏆</h3>
+                      <h3 className="font-bold text-xs sm:text-sm text-zinc-100">تحدي القراءة السنوي 🏆</h3>
                       <p className="text-[11px] text-zinc-400">إجمالي الكتب المكتملة</p>
                     </div>
                   </div>
