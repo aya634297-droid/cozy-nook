@@ -916,7 +916,7 @@ function App() {
             </div>
             <div>
               <h1 className="text-xl font-black bg-gradient-to-r from-amber-200 via-purple-300 to-purple-500 bg-clip-text text-transparent tracking-wide">
-                Cozy Nook ☕📖
+                Cozy Nook 
               </h1>
               <p className="text-[10px] text-zinc-400 font-medium">منطقة الراحة وملاذكِ الدافي مع الكتب</p>
             </div>
