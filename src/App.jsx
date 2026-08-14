@@ -66,7 +66,7 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // التنقل الرئيسي بين الأقسام
-  const [activeMainPage, setActiveMainPage] = useState("home"); 
+  const [activeMainPage, setActiveMainPage] = useState("home"); // home, wishlist, notes, collections, lending, archive, profile, settings, contact
 
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,10 +78,11 @@ function App() {
   const [customPrimaryColor, setCustomPrimaryColor] = useState("#8b5cf6");
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
-  // 🔍 البحث التلقائي الفوري أثناء الكتابة عبر Google Books API
+  // 🔍 البحث التلقائي عن الكتب عبر Google Books API (ميزة Bookmory)
   const [apiSearchQuery, setApiSearchQuery] = useState("");
   const [apiSearchResults, setApiSearchResults] = useState([]);
   const [isSearchingApi, setIsSearchingApi] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // الثيمات الـ 7 الشاملة
   const presetThemes = [
@@ -278,21 +279,6 @@ function App() {
     return () => clearInterval(interval);
   }, [isTimerRunning]);
 
-  // 🔍 تأثير البحث اللحظي أثناء كتابة اسم الكتاب تلقائياً (Live Search)
-  useEffect(() => {
-    if (!apiSearchQuery.trim()) {
-      setApiSearchResults([]);
-      setIsSearchingApi(false);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      searchGoogleBooksAPI(apiSearchQuery);
-    }, 400); // إرسال طلب البحث بعد 400ms من توقف الكتابة لعدم إجهاد السيرفر
-
-    return () => clearTimeout(timer);
-  }, [apiSearchQuery]);
-
   function triggerCelebration() {
     confetti({
       particleCount: 120,
@@ -301,13 +287,13 @@ function App() {
     });
   }
 
-  // 🔍 البحث التلقائي الفوري والمعدل عبر Google Books API
+  // 🔍 البحث التلقائي عبر Google Books API (ميزة Bookmory)
   async function searchGoogleBooksAPI(query) {
     if (!query.trim()) return;
     setIsSearchingApi(true);
+    setHasSearched(true);
     try {
-      // استخدام رابط استعلام مرن ومباشر يدعم الكتب العربية والإنجليزية بشكل دقيق
-      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=8&printType=books`);
+      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=6`);
       const data = await response.json();
       if (data && data.items) {
         setApiSearchResults(data.items);
@@ -330,7 +316,7 @@ function App() {
       coverUrl = coverUrl.replace("http://", "https://");
     }
 
-    const authorName = Array.isArray(info.authors) ? info.authors.join(", ") : (info.authors || "مؤلف");
+    const authorName = Array.isArray(info.authors) ? info.authors.join(", ") : (info.authors || "");
 
     setNewBook({
       ...newBook,
@@ -343,6 +329,7 @@ function App() {
     setCoverSource("url");
     setApiSearchResults([]);
     setApiSearchQuery("");
+    setHasSearched(false);
   }
 
   async function fetchBooks() {
@@ -2398,7 +2385,7 @@ function App() {
         </div>
       )}
 
-      {/* 🎨 Modal - إضافة أو تعديل كتاب مع ميزة البحث الذكي الفوري لـ Google Books API (مثل Bookmory) */}
+      {/* 🎨 Modal - إضافة أو تعديل كتاب مع ميزة البحث الذكي لـ Google Books API (مثل Bookmory) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className={`${currentThemeObj.card} border ${currentThemeObj.border} rounded-3xl w-full max-w-xl p-6 relative shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto`}>
@@ -2416,48 +2403,63 @@ function App() {
               </button>
             </div>
 
-            {/* 🔍 محرك بحث Google Books التلقائي الفوري أثناء الكتابة (ميزة Bookmory) */}
+            {/* 🔍 محرك بحث Google Books الآلي (ميزة Bookmory) */}
             {!editingBookId && (
               <div className="bg-gradient-to-r from-purple-950/60 via-black to-zinc-950 border border-purple-800/60 p-4 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-purple-300">
                   <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>البحث الذكي اللحظي عن أي كتاب (مثل Bookmory) أثناء الكتابة مباشرة:</span>
+                  <span>البحث الذكي عن أي كتاب (مثل Bookmory) لملء البيانات تلقائياً:</span>
                 </div>
-                <div className="relative">
+                <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="اكتبي اسم الكتاب هنا (مثلاً: جثة في المكتبة)..."
+                    placeholder="اكتبي اسم الكتاب أو المؤلف (عربي / إنجليزي)..."
                     value={apiSearchQuery}
                     onChange={(e) => setApiSearchQuery(e.target.value)}
-                    className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 outline-none focus:border-purple-500 transition pr-10"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        searchGoogleBooksAPI(apiSearchQuery);
+                      }
+                    }}
+                    className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 outline-none focus:border-purple-500"
                   />
-                  <Search className="w-4 h-4 absolute right-3 top-3 text-purple-400" />
+                  <button 
+                    type="button" 
+                    onClick={() => searchGoogleBooksAPI(apiSearchQuery)} 
+                    style={{ backgroundColor: currentThemeObj.color }} 
+                    className="text-white text-xs px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isSearchingApi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span>بحث أوتوماتيك</span>
+                  </button>
                 </div>
 
                 {isSearchingApi && (
-                  <p className="text-[11px] text-purple-300 flex items-center gap-2 pt-1">
+                  <p className="text-xs text-purple-300 flex items-center gap-2 pt-1">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>جاري البحث التلقائي عن نتائج مطابقة لـ "{apiSearchQuery}"...</span>
+                    <span>جاري الاتصال بـ Google Books لجلب كتابكِ...</span>
+                  </p>
+                )}
+
+                {hasSearched && !isSearchingApi && apiSearchResults.length === 0 && (
+                  <p className="text-xs text-amber-400 pt-1">
+                    لم نجد نتائج مطابقة، يمكنكِ كتابة البيانات يدوياً بالأسفل 👇
                   </p>
                 )}
 
                 {apiSearchResults.length > 0 && (
-                  <div className="space-y-2 pt-2 max-h-56 overflow-y-auto border-t border-zinc-900 pr-1">
-                    <p className="text-[10px] text-zinc-400">اختر الكتاب لتعبئة بياناته وغلافه تلقائياً:</p>
+                  <div className="space-y-2 pt-2 max-h-48 overflow-y-auto border-t border-zinc-900">
+                    <p className="text-[10px] text-zinc-400">انقري على الكتاب لتعبئة بياناته بالكامل تلقائياً:</p>
                     {apiSearchResults.map((item) => {
                       const info = item.volumeInfo || {};
                       const thumb = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=400";
                       return (
-                        <div 
-                          key={item.id} 
-                          onClick={() => handleSelectGoogleBook(item)} 
-                          className="bg-zinc-900 hover:bg-purple-950/80 border border-zinc-800 hover:border-purple-600 p-2 rounded-xl flex items-center gap-3 cursor-pointer transition"
-                        >
-                          <img src={thumb.replace("http://", "https://")} alt="" className="w-10 h-14 object-cover rounded-lg shadow shrink-0" />
+                        <div key={item.id} onClick={() => handleSelectGoogleBook(item)} className="bg-zinc-900 hover:bg-purple-950/60 border border-zinc-800 p-2 rounded-xl flex items-center gap-3 cursor-pointer transition">
+                          <img src={thumb.replace("http://", "https://")} alt="" className="w-8 h-12 object-cover rounded-lg" />
                           <div className="text-right">
                             <h5 className="font-bold text-xs text-white line-clamp-1">{info.title}</h5>
-                            <p className="text-[11px] text-purple-300 mt-0.5">المؤلف: {info.authors ? (Array.isArray(info.authors) ? info.authors.join(", ") : info.authors) : "غير محدد"}</p>
-                            {info.pageCount && <p className="text-[10px] text-zinc-500">{info.pageCount} صفحة</p>}
+                            <p className="text-[10px] text-zinc-400">{info.authors ? (Array.isArray(info.authors) ? info.authors.join(", ") : info.authors) : "مؤلف"} {info.pageCount && `| ${info.pageCount} صفحة`}</p>
                           </div>
                         </div>
                       );
@@ -2481,7 +2483,7 @@ function App() {
                     <input
                       type="text"
                       required
-                      placeholder="مثلاً: جثة في المكتبة"
+                      placeholder="مثلاً: القربان"
                       value={newBook.title}
                       onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
                       className="w-full bg-black border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 transition"
@@ -2493,7 +2495,7 @@ function App() {
                     <input
                       type="text"
                       required
-                      placeholder="مثلاً: أجاثا كريستي"
+                      placeholder="مثلاً: مروة گوهر"
                       value={newBook.author}
                       onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
                       className="w-full bg-black border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 transition"
@@ -2765,48 +2767,147 @@ function App() {
         </div>
       )}
 
-      {/* تفاصيل الكتاب الممتدة */}
+      {/* الصفحة الممتدة الفاخرة لتفاصيل الكتاب */}
       {selectedBookDetails && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl z-50 flex flex-col overflow-y-auto animate-in fade-in duration-300">
           <div className="bg-black/90 border-b border-zinc-800/80 sticky top-0 z-30 px-4 sm:px-8 py-4 flex items-center justify-between backdrop-blur-md">
-            <button onClick={closeBookDetails} className="flex items-center gap-2 text-xs font-bold text-zinc-300 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 px-4 py-2 rounded-xl transition cursor-pointer shadow-md"><ArrowRight className="w-4 h-4 text-purple-400" /><span>الرجوع للمكتبة الرئيسية</span></button>
+            <button
+              onClick={closeBookDetails}
+              className="flex items-center gap-2 text-xs font-bold text-zinc-300 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 px-4 py-2 rounded-xl transition cursor-pointer shadow-md"
+            >
+              <ArrowRight className="w-4 h-4 text-purple-400" />
+              <span>الرجوع للمكتبة الرئيسية</span>
+            </button>
+
             <div className="flex items-center gap-2">
-              <button onClick={() => { const bookToEdit = selectedBookDetails; closeBookDetails(); handleOpenEditModal(bookToEdit); }} className="flex items-center gap-1.5 text-xs font-bold text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-3.5 py-2 rounded-xl transition cursor-pointer"><Pencil className="w-3.5 h-3.5 text-amber-400" /><span>تعديل الكتاب</span></button>
-              <button onClick={() => { const bookToDelete = selectedBookDetails; triggerDeleteModal(bookToDelete); }} className="flex items-center gap-1.5 text-xs font-bold text-red-400 bg-red-950/40 hover:bg-red-950/80 border border-red-900/50 px-3.5 py-2 rounded-xl transition cursor-pointer"><Trash2 className="w-3.5 h-3.5" /><span>حذف الكتاب</span></button>
+              <button
+                onClick={() => {
+                  const bookToEdit = selectedBookDetails;
+                  closeBookDetails();
+                  handleOpenEditModal(bookToEdit);
+                }}
+                className="flex items-center gap-1.5 text-xs font-bold text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-3.5 py-2 rounded-xl transition cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                <span>تعديل الكتاب</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const bookToDelete = selectedBookDetails;
+                  triggerDeleteModal(bookToDelete);
+                }}
+                className="flex items-center gap-1.5 text-xs font-bold text-red-400 bg-red-950/40 hover:bg-red-950/80 border border-red-900/50 px-3.5 py-2 rounded-xl transition cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>حذف الكتاب</span>
+              </button>
             </div>
           </div>
 
           <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 py-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-              <div className="space-y-4 text-center sticky top-20">
-                <div className="relative group"><img src={selectedBookDetails.cover} alt={selectedBookDetails.title} className="w-full max-w-xs mx-auto aspect-[2/3] object-cover rounded-3xl shadow-2xl border border-zinc-800 group-hover:scale-102 transition duration-500" /></div>
-                {selectedBookDetails.pdf_url && (<button onClick={() => openPdfViewer(selectedBookDetails.pdf_url, selectedBookDetails.title)} style={{ backgroundColor: currentThemeObj.color }} className="w-full max-w-xs mx-auto flex items-center justify-center gap-2 text-white py-3.5 rounded-2xl font-bold shadow-xl transition cursor-pointer text-sm hover:opacity-90"><FileText className="w-4 h-4" /><span>قراءة ملف PDF المدمج 📖</span></button>)}
+              <div className="space-y-4 text-center ">
+                <div className="relative group">
+                  <img
+                    src={selectedBookDetails.cover}
+                    alt={selectedBookDetails.title}
+                    className="w-full max-w-xs mx-auto aspect-[2/3] object-cover rounded-3xl shadow-2xl border border-zinc-800 group-hover:scale-102 transition duration-500"
+                  />
+                </div>
+
+                {selectedBookDetails.pdf_url && (
+                  <button
+                    onClick={() => openPdfViewer(selectedBookDetails.pdf_url, selectedBookDetails.title)}
+                    style={{ backgroundColor: currentThemeObj.color }}
+                    className="w-full max-w-xs mx-auto flex items-center justify-center gap-2 text-white py-3.5 rounded-2xl font-bold shadow-xl transition cursor-pointer text-sm hover:opacity-90"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>قراءة ملف PDF المدمج 📖</span>
+                  </button>
+                )}
               </div>
 
               <div className="md:col-span-2 space-y-6">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    {(selectedBookDetails.categories && selectedBookDetails.categories.length > 0 ? selectedBookDetails.categories : [selectedBookDetails.category || "روايات"]).map((cat, idx) => (<span key={idx} className="text-white text-xs px-3.5 py-1 rounded-full font-bold shadow-md" style={{ backgroundColor: currentThemeObj.color }}>{cat}</span>))}
-                    {selectedBookDetails.series_name && (<span className="bg-purple-950 border border-purple-800 text-purple-200 text-xs px-3.5 py-1 rounded-full font-bold shadow-md flex items-center gap-1"><Layers className="w-3.5 h-3.5 text-purple-400" /><span>سلسلة: {selectedBookDetails.series_name} {selectedBookDetails.part_number && `(الجزء ${selectedBookDetails.part_number})`}</span></span>)}
+                    {(selectedBookDetails.categories && selectedBookDetails.categories.length > 0 
+                      ? selectedBookDetails.categories 
+                      : [selectedBookDetails.category || "روايات"]
+                    ).map((cat, idx) => (
+                      <span key={idx} className="text-white text-xs px-3.5 py-1 rounded-full font-bold shadow-md" style={{ backgroundColor: currentThemeObj.color }}>
+                        {cat}
+                      </span>
+                    ))}
+
+                    {selectedBookDetails.series_name && (
+                      <span className="bg-purple-950 border border-purple-800 text-purple-200 text-xs px-3.5 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5 text-purple-400" />
+                        <span>سلسلة: {selectedBookDetails.series_name} {selectedBookDetails.part_number && `(الجزء ${selectedBookDetails.part_number})`}</span>
+                      </span>
+                    )}
                   </div>
+
                   <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">{selectedBookDetails.title}</h1>
-                  <p className="text-zinc-400 text-sm sm:text-base flex items-center gap-2"><User className="w-4 h-4 text-purple-400" /><span>اسم المؤلف: <strong className="text-zinc-200">{selectedBookDetails.author}</strong></span></p>
+                  <p className="text-zinc-400 text-sm sm:text-base flex items-center gap-2">
+                    <User className="w-4 h-4 text-purple-400" />
+                    <span>اسم المؤلف: <strong className="text-zinc-200">{selectedBookDetails.author}</strong></span>
+                  </p>
                 </div>
 
+                {/* أزرار الإجراءات السريعة والمؤقت */}
                 <div className="flex flex-wrap items-center gap-3 bg-zinc-950 p-3 rounded-2xl border border-zinc-900">
-                  {(!activeTimerBook || activeTimerBook.id !== selectedBookDetails.id) && (<button onClick={() => startBookTimer(selectedBookDetails)} className="flex items-center gap-2 text-xs font-bold text-purple-200 bg-purple-950/80 hover:bg-purple-900 border border-purple-800/80 px-4 py-2.5 rounded-xl transition cursor-pointer shadow-md"><Play className="w-4 h-4 text-purple-400 fill-current" /><span>بدء مؤقت القراءة لهذا الكتاب ⏱️</span></button>)}
-                  <button onClick={() => { setQuickProgressBook(selectedBookDetails); setQuickProgressInput(selectedBookDetails.progress || ""); }} className="flex items-center gap-2 text-xs font-bold text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-800/80 px-4 py-2.5 rounded-xl transition cursor-pointer"><TrendingUp className="w-4 h-4 text-emerald-400" /><span>تحديث الصفحة مباشرة</span></button>
-                  <button onClick={() => setQuickStatusBook(selectedBookDetails)} className="flex items-center gap-2 text-xs font-bold text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 px-4 py-2.5 rounded-xl transition cursor-pointer"><RefreshCw className="w-4 h-4 text-purple-400" /><span>تغيير الحالة: {getStatusLabel(selectedBookDetails.status)}</span></button>
+                  {(!activeTimerBook || activeTimerBook.id !== selectedBookDetails.id) && (
+                    <button
+                      onClick={() => startBookTimer(selectedBookDetails)}
+                      className="flex items-center gap-2 text-xs font-bold text-purple-200 bg-purple-950/80 hover:bg-purple-900 border border-purple-800/80 px-4 py-2.5 rounded-xl transition cursor-pointer shadow-md"
+                    >
+                      <Play className="w-4 h-4 text-purple-400 fill-current" />
+                      <span>بدء مؤقت القراءة لهذا الكتاب ⏱️</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setQuickProgressBook(selectedBookDetails);
+                      setQuickProgressInput(selectedBookDetails.progress || "");
+                    }}
+                    className="flex items-center gap-2 text-xs font-bold text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-800/80 px-4 py-2.5 rounded-xl transition cursor-pointer"
+                  >
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    <span>تحديث الصفحة مباشرة</span>
+                  </button>
+
+                  <button
+                    onClick={() => setQuickStatusBook(selectedBookDetails)}
+                    className="flex items-center gap-2 text-xs font-bold text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 px-4 py-2.5 rounded-xl transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4 text-purple-400" />
+                    <span>تغيير الحالة: {getStatusLabel(selectedBookDetails.status)}</span>
+                  </button>
                 </div>
 
+                {/* أجزاء نفس السلسلة إن وجدت */}
                 {seriesRelatedBooks.length > 0 && (
                   <div className="bg-purple-950/20 border border-purple-900/40 p-4 rounded-2xl space-y-3">
-                    <h3 className="text-xs font-bold text-purple-300 flex items-center gap-2"><Layers className="w-4 h-4 text-purple-400" /><span>أجزاء أخرى من هذه السلسلة ({selectedBookDetails.series_name}):</span></h3>
+                    <h3 className="text-xs font-bold text-purple-300 flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-purple-400" />
+                      <span>أجزاء أخرى من هذه السلسلة ({selectedBookDetails.series_name}):</span>
+                    </h3>
                     <div className="flex gap-3 overflow-x-auto pb-1">
                       {seriesRelatedBooks.map((relBook) => (
-                        <div key={relBook.id} onClick={() => openBookDetails(relBook)} className="bg-black/60 border border-zinc-800 p-2 rounded-xl flex items-center gap-2.5 cursor-pointer hover:border-purple-800 transition shrink-0">
+                        <div
+                          key={relBook.id}
+                          onClick={() => openBookDetails(relBook)}
+                          className="bg-black/60 border border-zinc-800 p-2 rounded-xl flex items-center gap-2.5 cursor-pointer hover:border-purple-800 transition shrink-0"
+                        >
                           <img src={relBook.cover} alt={relBook.title} className="w-10 h-14 object-cover rounded-lg" />
-                          <div className="text-right"><p className="text-xs font-bold text-white line-clamp-1">{relBook.title}</p><p className="text-[10px] text-purple-400 font-bold">{relBook.part_number ? `الجزء ${relBook.part_number}` : "جزء آخر"}</p></div>
+                          <div className="text-right">
+                            <p className="text-xs font-bold text-white line-clamp-1">{relBook.title}</p>
+                            <p className="text-[10px] text-purple-400 font-bold">
+                              {relBook.part_number ? `الجزء ${relBook.part_number}` : "جزء آخر"}
+                            </p>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2814,65 +2915,209 @@ function App() {
                 )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-zinc-300 bg-zinc-950 p-4 rounded-2xl border border-zinc-900">
-                  <div className="space-y-1 bg-black/40 p-3 rounded-xl border border-zinc-800/80"><span className="text-zinc-500 block text-[11px]">التقييم الشخصي</span><div className="flex items-center gap-1 font-black text-amber-400 text-sm"><Star className="w-4 h-4 fill-current" /><span>{selectedBookDetails.rating} / 5</span></div></div>
-                  <div className="space-y-1 bg-black/40 p-3 rounded-xl border border-zinc-800/80"><span className="text-zinc-500 block text-[11px]">حالة القراءة</span><span className="font-bold text-white text-sm">{getStatusLabel(selectedBookDetails.status)}</span></div>
-                  <div className="space-y-1 col-span-2 sm:col-span-1 bg-black/40 p-3 rounded-xl border border-zinc-800/80"><span className="text-zinc-500 block text-[11px]">حالة الملكية</span><span className={`font-bold text-xs ${selectedBookDetails.is_purchased ? "text-emerald-400" : "text-amber-400"}`}>{selectedBookDetails.is_purchased ? "ممتلك (تم شراؤه) 🛒" : "قائمة رغبات الشراء (Wishlist)"}</span></div>
+                  <div className="space-y-1 bg-black/40 p-3 rounded-xl border border-zinc-800/80">
+                    <span className="text-zinc-500 block text-[11px]">التقييم الشخصي</span>
+                    <div className="flex items-center gap-1 font-black text-amber-400 text-sm">
+                      <Star className="w-4 h-4 fill-current" />
+                      <span>{selectedBookDetails.rating} / 5</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 bg-black/40 p-3 rounded-xl border border-zinc-800/80">
+                    <span className="text-zinc-500 block text-[11px]">حالة القراءة</span>
+                    <span className="font-bold text-white text-sm">{getStatusLabel(selectedBookDetails.status)}</span>
+                  </div>
+
+                  <div className="space-y-1 col-span-2 sm:col-span-1 bg-black/40 p-3 rounded-xl border border-zinc-800/80">
+                    <span className="text-zinc-500 block text-[11px]">حالة الملكية</span>
+                    <span className={`font-bold text-xs ${selectedBookDetails.is_purchased ? "text-emerald-400" : "text-amber-400"}`}>
+                      {selectedBookDetails.is_purchased ? "ممتلك (تم شراؤه) 🛒" : "قائمة رغبات الشراء (Wishlist)"}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="bg-zinc-950 p-5 rounded-2xl border border-zinc-900 space-y-2.5">
-                  <div className="flex justify-between text-xs text-zinc-400"><span>تقدم الصفحات المقروءة</span><span className="font-bold text-white">ص {selectedBookDetails.progress || 0} / {selectedBookDetails.totalPages || 0} ({selectedBookDetails.totalPages > 0 ? Math.round((selectedBookDetails.progress / selectedBookDetails.totalPages) * 100) : 0}%)</span></div>
-                  <div className="w-full h-3 bg-black rounded-full overflow-hidden border border-zinc-800"><div className="h-full rounded-full transition-all duration-500" style={{ backgroundColor: currentThemeObj.color, width: `${selectedBookDetails.totalPages > 0 ? (selectedBookDetails.progress / selectedBookDetails.totalPages) * 100 : 0}%` }}></div></div>
+                  <div className="flex justify-between text-xs text-zinc-400">
+                    <span>تقدم الصفحات المقروءة</span>
+                    <span className="font-bold text-white">
+                      ص {selectedBookDetails.progress || 0} / {selectedBookDetails.totalPages || 0} (
+                      {selectedBookDetails.totalPages > 0 
+                        ? Math.round((selectedBookDetails.progress / selectedBookDetails.totalPages) * 100) 
+                        : 0}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-3 bg-black rounded-full overflow-hidden border border-zinc-800">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        backgroundColor: currentThemeObj.color,
+                        width: `${selectedBookDetails.totalPages > 0 ? (selectedBookDetails.progress / selectedBookDetails.totalPages) * 100 : 0}%`
+                      }}
+                    ></div>
+                  </div>
                 </div>
 
                 {selectedBookDetails.is_purchased && (
                   <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 p-5 rounded-3xl border border-amber-900/30 space-y-3">
-                    <h3 className="text-xs font-bold text-amber-300 flex items-center gap-2"><ShoppingBag className="w-4 h-4 text-amber-400" /><span>سجل وبيانات الشراء الذكرى:</span></h3>
+                    <h3 className="text-xs font-bold text-amber-300 flex items-center gap-2">
+                      <ShoppingBag className="w-4 h-4 text-amber-400" />
+                      <span>سجل وبيانات الشراء الذكرى:</span>
+                    </h3>
+
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-zinc-300">
-                      {selectedBookDetails.price && (<div className="flex items-center gap-2 bg-black/50 p-2.5 rounded-xl border border-zinc-800"><DollarSign className="w-4 h-4 text-emerald-400" /><span>السعر: <strong>{selectedBookDetails.price} ج.م</strong></span></div>)}
-                      {selectedBookDetails.purchase_location && (<div className="flex items-center gap-2 bg-black/50 p-2.5 rounded-xl border border-zinc-800"><MapPin className="w-4 h-4 text-amber-400" /><span>المكان: <strong>{selectedBookDetails.purchase_location}</strong></span></div>)}
-                      {selectedBookDetails.purchase_date && (<div className="flex items-center gap-2 bg-black/50 p-2.5 rounded-xl border border-zinc-800"><Calendar className="w-4 h-4 text-blue-400" /><span>التاريخ: <strong>{selectedBookDetails.purchase_date}</strong></span></div>)}
+                      {selectedBookDetails.price && (
+                        <div className="flex items-center gap-2 bg-black/50 p-2.5 rounded-xl border border-zinc-800">
+                          <DollarSign className="w-4 h-4 text-emerald-400" />
+                          <span>السعر: <strong>{selectedBookDetails.price} ج.م</strong></span>
+                        </div>
+                      )}
+
+                      {selectedBookDetails.purchase_location && (
+                        <div className="flex items-center gap-2 bg-black/50 p-2.5 rounded-xl border border-zinc-800">
+                          <MapPin className="w-4 h-4 text-amber-400" />
+                          <span>المكان: <strong>{selectedBookDetails.purchase_location}</strong></span>
+                        </div>
+                      )}
+
+                      {selectedBookDetails.purchase_date && (
+                        <div className="flex items-center gap-2 bg-black/50 p-2.5 rounded-xl border border-zinc-800">
+                          <Calendar className="w-4 h-4 text-blue-400" />
+                          <span>التاريخ: <strong>{selectedBookDetails.purchase_date}</strong></span>
+                        </div>
+                      )}
                     </div>
-                    {selectedBookDetails.purchase_notes && (<p className="text-xs text-zinc-300 italic bg-black/40 p-3 rounded-xl border border-zinc-800/80 leading-relaxed">"{selectedBookDetails.purchase_notes}"</p>)}
+
+                    {selectedBookDetails.purchase_notes && (
+                      <p className="text-xs text-zinc-300 italic bg-black/40 p-3 rounded-xl border border-zinc-800/80 leading-relaxed">
+                        "{selectedBookDetails.purchase_notes}"
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
+            {/* 📝 دفتر الملاحظات */}
             <div className="space-y-4 pt-6 border-t border-zinc-900">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-base font-bold flex items-center gap-2" style={{ color: currentThemeObj.color }}><StickyNote className="w-5 h-5" /><span>دفتر الملاحظات والاقتباسات الخاصة بالكتاب ({bookNotesList.length})</span></h3>
-                {!showAddNoteForm && (<button onClick={() => setShowAddNoteForm(true)} style={{ backgroundColor: currentThemeObj.color }} className="flex items-center gap-2 text-white text-xs px-4 py-2 rounded-xl font-bold transition shadow-md cursor-pointer hover:opacity-90"><Plus className="w-4 h-4" /><span>إضافة ملاحظة أو اقتباس جديد</span></button>)}
+                <h3 className="text-base font-bold flex items-center gap-2" style={{ color: currentThemeObj.color }}>
+                  <StickyNote className="w-5 h-5" />
+                  <span>دفتر الملاحظات والاقتباسات الخاصة بالكتاب ({bookNotesList.length})</span>
+                </h3>
+
+                {!showAddNoteForm && (
+                  <button
+                    onClick={() => setShowAddNoteForm(true)}
+                    style={{ backgroundColor: currentThemeObj.color }}
+                    className="flex items-center gap-2 text-white text-xs px-4 py-2 rounded-xl font-bold transition shadow-md cursor-pointer hover:opacity-90"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>إضافة ملاحظة أو اقتباس جديد</span>
+                  </button>
+                )}
               </div>
 
               {showAddNoteForm && (
                 <form onSubmit={handleAddNote} className="bg-zinc-950 border border-purple-900/60 p-5 rounded-3xl space-y-3 shadow-xl animate-in fade-in duration-300">
-                  <div className="flex justify-between items-center border-b border-zinc-900 pb-2"><span className="text-xs font-bold text-purple-300">كتابة ملاحظة / اقتباس جديد</span><button type="button" onClick={() => setShowAddNoteForm(false)} className="text-zinc-500 hover:text-white"><X className="w-4 h-4" /></button></div>
-                  <textarea rows={3} placeholder="اكتبي اقتباسكِ المفضل من هذا الكتاب، أو أفكاركِ الخاصة..." value={newNoteContent} onChange={(e) => setNewNoteContent(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none leading-relaxed resize-none"></textarea>
+                  <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+                    <span className="text-xs font-bold text-purple-300">كتابة ملاحظة / اقتباس جديد</span>
+                    <button type="button" onClick={() => setShowAddNoteForm(false)} className="text-zinc-500 hover:text-white">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={3}
+                    placeholder="اكتبي اقتباسكِ المفضل من هذا الكتاب، أو أفكاركِ الخاصة..."
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none leading-relaxed resize-none"
+                  ></textarea>
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
-                    <input type="text" placeholder="اسم/رقم الفصل (اختياري)" value={newNoteChapter} onChange={(e) => setNewNoteChapter(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none" />
-                    <input type="number" placeholder="رقم الصفحة (اختياري)" value={newNotePage} onChange={(e) => setNewNotePage(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none" />
+                    <input
+                      type="text"
+                      placeholder="اسم/رقم الفصل (اختياري)"
+                      value={newNoteChapter}
+                      onChange={(e) => setNewNoteChapter(e.target.value)}
+                      className="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none"
+                    />
+                    <input
+                      type="number"
+                      placeholder="رقم الصفحة (اختياري)"
+                      value={newNotePage}
+                      onChange={(e) => setNewNotePage(e.target.value)}
+                      className="w-full bg-black border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none"
+                    />
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setShowAddNoteForm(false)} className="flex-1 bg-zinc-900 text-zinc-400 text-xs py-2.5 rounded-xl">إلغاء</button>
-                      <button type="submit" disabled={isSavingNote} style={{ backgroundColor: currentThemeObj.color }} className="flex-1 text-white text-xs py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">{isSavingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}<span>حفظ</span></button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddNoteForm(false)}
+                        className="flex-1 bg-zinc-900 text-zinc-400 text-xs py-2.5 rounded-xl"
+                      >
+                        إلغاء
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingNote}
+                        style={{ backgroundColor: currentThemeObj.color }}
+                        className="flex-1 text-white text-xs py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSavingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        <span>حفظ</span>
+                      </button>
                     </div>
                   </div>
                 </form>
               )}
 
-              {loadingNotes ? (<div className="text-center py-6 text-xs text-zinc-500">جاري تحميل الملاحظات...</div>) : bookNotesList.length === 0 ? (<div className="text-center py-8 text-xs text-zinc-600 bg-zinc-950 rounded-2xl border border-zinc-900">لا توجد ملاحظات مدونة لهذا الكتاب بعد. اضغطي زر "إضافة ملاحظة" فوق لتبدئي التدوين! 📝</div>) : (
+              {loadingNotes ? (
+                <div className="text-center py-6 text-xs text-zinc-500">جاري تحميل الملاحظات...</div>
+              ) : bookNotesList.length === 0 ? (
+                <div className="text-center py-8 text-xs text-zinc-600 bg-zinc-950 rounded-2xl border border-zinc-900">
+                  لا توجد ملاحظات مدونة لهذا الكتاب بعد. اضغطي زر "إضافة ملاحظة" فوق لتبدئي التدوين! 📝
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {bookNotesList.map((note) => (
-                    <div key={note.id} className={`bg-zinc-950 border ${currentThemeObj.border} rounded-2xl p-4 flex justify-between items-start gap-3 shadow-md`}>
+                    <div 
+                      key={note.id}
+                      className={`bg-zinc-950 border ${currentThemeObj.border} rounded-2xl p-4 flex justify-between items-start gap-3 shadow-md`}
+                    >
                       <div className="space-y-2 flex-1">
                         <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                          {note.chapter && (<span className="text-white px-2.5 py-0.5 rounded-md font-medium flex items-center gap-1" style={{ backgroundColor: currentThemeObj.color }}><BookmarkCheck className="w-3 h-3" /><span>{note.chapter}</span></span>)}
-                          {note.page_number && (<span className="bg-black border border-zinc-800 text-zinc-400 px-2.5 py-0.5 rounded-md font-medium flex items-center gap-1"><Hash className="w-3 h-3 text-zinc-500" /><span>صفحة {note.page_number}</span></span>)}
+                          {note.chapter && (
+                            <span className="text-white px-2.5 py-0.5 rounded-md font-medium flex items-center gap-1" style={{ backgroundColor: currentThemeObj.color }}>
+                              <BookmarkCheck className="w-3 h-3" />
+                              <span>{note.chapter}</span>
+                            </span>
+                          )}
+                          {note.page_number && (
+                            <span className="bg-black border border-zinc-800 text-zinc-400 px-2.5 py-0.5 rounded-md font-medium flex items-center gap-1">
+                              <Hash className="w-3 h-3 text-zinc-500" />
+                              <span>صفحة {note.page_number}</span>
+                            </span>
+                          )}
                         </div>
-                        <p className="text-xs text-zinc-200 leading-relaxed font-sans whitespace-pre-wrap">"{note.content}"</p>
+                        <p className="text-xs text-zinc-200 leading-relaxed font-sans whitespace-pre-wrap">
+                          "{note.content}"
+                        </p>
                       </div>
+
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setQuoteToShare({ book: selectedBookDetails, note })} title="مشاركة كبطاقة اقتباس صورة" className="text-zinc-500 hover:text-purple-400 transition p-1 cursor-pointer"><Share2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDeleteNote(note.id)} className="text-zinc-600 hover:text-red-400 transition p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button
+                          onClick={() => setQuoteToShare({ book: selectedBookDetails, note })}
+                          title="مشاركة كبطاقة اقتباس صورة"
+                          className="text-zinc-500 hover:text-purple-400 transition p-1 cursor-pointer"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteNote(note.id)}
+                          className="text-zinc-600 hover:text-red-400 transition p-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -2883,48 +3128,112 @@ function App() {
         </div>
       )}
 
-      {/* مودال مشاركة اقتباس */}
+      {/* Modal - بطاقة الاقتباسات للمشاركة كـ صورة */}
       {quoteToShare && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[70] flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-purple-900/60 rounded-3xl w-full max-w-md p-6 relative shadow-2xl space-y-5 text-center">
-            <button onClick={() => setQuoteToShare(null)} className="absolute top-4 left-4 text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
+            <button onClick={() => setQuoteToShare(null)} className="absolute top-4 left-4 text-zinc-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+
             <h3 className="text-sm font-bold text-purple-300">بطاقة اقتباس مخصصة للمشاركة</h3>
+
             <div className="bg-gradient-to-br from-zinc-900 via-purple-950/40 to-black p-6 rounded-2xl border border-purple-800/40 shadow-2xl text-right space-y-4">
-              <div className="flex items-center gap-3 border-b border-zinc-800/80 pb-3"><img src={quoteToShare.book.cover} alt="" className="w-10 h-14 object-cover rounded-lg shadow" /><div><h4 className="font-bold text-xs text-white">{quoteToShare.book.title}</h4><p className="text-[11px] text-zinc-400">{quoteToShare.book.author}</p></div></div>
-              <p className="text-xs text-zinc-200 leading-relaxed italic font-serif">"{quoteToShare.note.content}"</p>
-              {quoteToShare.note.page_number && (<span className="text-[10px] text-purple-400 block text-left">صفحة {quoteToShare.note.page_number}</span>)}
+              <div className="flex items-center gap-3 border-b border-zinc-800/80 pb-3">
+                <img src={quoteToShare.book.cover} alt="" className="w-10 h-14 object-cover rounded-lg shadow" />
+                <div>
+                  <h4 className="font-bold text-xs text-white">{quoteToShare.book.title}</h4>
+                  <p className="text-[11px] text-zinc-400">{quoteToShare.book.author}</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-200 leading-relaxed italic font-serif">
+                "{quoteToShare.note.content}"
+              </p>
+
+              {quoteToShare.note.page_number && (
+                <span className="text-[10px] text-purple-400 block text-left">صفحة {quoteToShare.note.page_number}</span>
+              )}
             </div>
-            <div className="flex gap-2 justify-center"><button onClick={() => { alert("يمكنكِ أخذ لقطة شاشة للبطاقة ورؤيتها في الاستوري الخاص بكِ!"); setQuoteToShare(null); }} className="bg-purple-900 hover:bg-purple-800 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition cursor-pointer">جاهزة للمشاركة 📸</button></div>
+
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => {
+                  alert("يمكنكِ أخذ لقطة شاشة للبطاقة ورؤيتها في الاستوري الخاص بكِ!");
+                  setQuoteToShare(null);
+                }}
+                className="bg-purple-900 hover:bg-purple-800 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition cursor-pointer"
+              >
+                جاهزة للمشاركة 📸
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* مودال الحذف */}
+      {/* Modal - نافذة الحذف مع التأكيد */}
       {deleteModalOpen && bookToDelete && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[60] flex items-center justify-center p-4">
           <div className={`${currentThemeObj.card} border ${currentThemeObj.border} rounded-3xl w-full max-w-md p-6 text-center space-y-5 shadow-2xl`}>
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-red-950/50 border border-red-900/60 text-red-400 flex items-center justify-center"><AlertTriangle className="w-6 h-6" /></div>
-            <div className="space-y-2"><h3 className="text-lg font-bold text-white">حذف الكتاب</h3><p className="text-xs text-zinc-400 leading-relaxed">هل أنتِ متأكدة من حذف كتاب <span className="text-purple-300 font-bold">"{bookToDelete.title}"</span>؟</p></div>
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-red-950/50 border border-red-900/60 text-red-400 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-white">حذف الكتاب</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                هل أنتِ متأكدة من حذف كتاب <span className="text-purple-300 font-bold">"{bookToDelete.title}"</span>؟
+              </p>
+            </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => { setDeleteModalOpen(false); setBookToDelete(null); }} className="flex-1 bg-zinc-900 text-zinc-300 text-xs py-2.5 rounded-xl border border-zinc-800 cursor-pointer">إلغاء</button>
-              <button onClick={confirmDeleteBook} disabled={isDeleting} className="flex-1 bg-red-950 text-red-200 border border-red-800 text-xs py-2.5 rounded-xl font-bold cursor-pointer disabled:opacity-50">{isDeleting ? "جاري الحذف..." : "نعم، إحذف"}</button>
+              <button
+                onClick={() => { setDeleteModalOpen(false); setBookToDelete(null); }}
+                className="flex-1 bg-zinc-900 text-zinc-300 text-xs py-2.5 rounded-xl border border-zinc-800 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={confirmDeleteBook}
+                disabled={isDeleting}
+                className="flex-1 bg-red-950 text-red-200 border border-red-800 text-xs py-2.5 rounded-xl font-bold cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? "جاري الحذف..." : "نعم، إحذف"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* عارض PDF */}
+      {/* Modal - عارض الـ PDF مع وضع الـ Zen */}
       {pdfModalOpen && activePdfUrl && (
         <div className={`fixed inset-0 bg-black backdrop-blur-lg z-[60] flex flex-col transition-all duration-300 ${isZenMode ? "p-0" : "p-2 sm:p-6"}`}>
           <div className={`bg-zinc-950 border border-zinc-800 rounded-3xl w-full h-full flex flex-col overflow-hidden ${isZenMode ? "rounded-none border-none" : ""}`}>
             <div className="flex justify-between items-center bg-black/90 px-6 py-3 border-b border-zinc-900">
-              <div className="flex items-center gap-3"><FileText className="w-5 h-5 text-purple-400" /><h3 className="text-sm font-bold text-zinc-200 truncate max-w-xs sm:max-w-md">قراءة: {activePdfTitle}</h3></div>
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-purple-400" />
+                <h3 className="text-sm font-bold text-zinc-200 truncate max-w-xs sm:max-w-md">
+                  قراءة: {activePdfTitle}
+                </h3>
+              </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsZenMode(!isZenMode)} style={{ backgroundColor: isZenMode ? currentThemeObj.color : "transparent" }} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-zinc-800 text-zinc-200 cursor-pointer"><Sparkles className="w-3.5 h-3.5" /><span>{isZenMode ? "إنهاء وضع التركيز" : "وضع التركيز (Zen)"}</span></button>
-                <button onClick={() => { setPdfModalOpen(false); setActivePdfUrl(""); setIsZenMode(false); }} className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer"><X className="w-5 h-5" /></button>
+                <button
+                  onClick={() => setIsZenMode(!isZenMode)}
+                  style={{ backgroundColor: isZenMode ? currentThemeObj.color : "transparent" }}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-zinc-800 text-zinc-200 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{isZenMode ? "إنهاء وضع التركيز" : "وضع التركيز (Zen)"}</span>
+                </button>
+                <button
+                  onClick={() => { setPdfModalOpen(false); setActivePdfUrl(""); setIsZenMode(false); }}
+                  className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
             </div>
-            <div className="flex-1 bg-zinc-900 w-full h-full relative"><iframe src={activePdfUrl} title={activePdfTitle} className="w-full h-full border-none"></iframe></div>
+            <div className="flex-1 bg-zinc-900 w-full h-full relative">
+              <iframe src={activePdfUrl} title={activePdfTitle} className="w-full h-full border-none"></iframe>
+            </div>
           </div>
         </div>
       )}
